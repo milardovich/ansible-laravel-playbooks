@@ -1,0 +1,50 @@
+---
+- name: Copy .env file, Install Composer, and Run Composer Install
+  hosts: "{{ target_hosts }}"  # Replace with the actual host or group
+  become: yes
+  vars_files:
+    - vars.yml  # Path to your variables file
+
+  tasks:
+    - name: Copy .env file to /back folder
+      copy:
+        src: ./.env  # Replace with the path to your .env file
+        dest: /home/ubuntu/velo-legal/back/.env
+      notify: Composer Install
+
+    - name: Start Docker Container
+      docker_container:
+        name: "{{ container_name }}"
+        image: "{{ container_name }}"
+        state: started
+        detach: yes
+
+    - name: Install Composer Inside Docker Container
+      docker_container:
+        name: "{{ container_name }}"
+        image: "{{ container_name }}"
+        command: |
+          sh -c 'php -r "copy(\"https://getcomposer.org/installer\", \"composer-setup.php\");" && php composer-setup.php --install-dir=/usr/local/bin --filename=composer && php -r "unlink(\"composer-setup.php\");"'
+        detach: yes
+
+    - name: Run Composer Install Inside Docker Container
+      docker_container:
+        name: "{{ container_name }}"
+        image: "{{ container_name }}"
+        command: "composer install"
+        detach: yes
+
+    - name: Run php artisan migrate
+      docker_container:
+        name: "{{ container_name }}"
+        image: "{{ container_name }}"
+        command: "php artisan migrate"
+        detach: yes
+
+    - name: Run php artisan key:generate
+      docker_container:
+        name: "{{ container_name }}"
+        image: "{{ container_name }}"
+        command: "php artisan key:generate"
+        detach: yes        
+

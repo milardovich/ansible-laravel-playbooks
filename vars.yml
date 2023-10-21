@@ -1,0 +1,4 @@
+repository_url: git@github.com:repo/test.git
+container_name: container-name
+target_hosts:
+  - 1.111.111.111

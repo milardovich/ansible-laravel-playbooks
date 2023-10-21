@@ -1,0 +1,61 @@
+---
+- name: Install Docker, Clone Repository, and Run Container
+  become: yes
+  hosts: "{{ target_hosts }}"
+  vars_files:
+    - vars.yml  
+  tasks:
+    - name: Update APT package cache
+      apt:
+        update_cache: yes
+      when: ansible_os_family == "Debian"
+
+    - name: Install required packages (Docker and Git)
+      apt:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - docker.io
+        - git
+      when: ansible_os_family == "Debian"
+
+    - name: Start Docker service
+      systemd:
+        name: docker
+        state: started
+        enabled: yes
+      when: ansible_os_family == "Debian"
+
+    - name: Start SSH agent and add key
+      ansible.builtin.shell: |
+        eval $(ssh-agent)
+        ssh-add /home/ubuntu/.ssh/id_rsa
+      args:
+        executable: /bin/bash  # Use /bin/bash for the shell
+
+    - name: Clone the repository using the SSH key
+      git:
+        repo: "{{ repository_url }}"
+        dest: /home/ubuntu/velo-legal
+        accept_hostkey: yes  # Only needed for the first time
+        force: yes
+        key_file: /home/ubuntu/.ssh/id_rsa 
+        update: yes
+
+    - name: Build Docker image from Dockerfile in 'back' folder
+      docker_image:
+        name: "{{ container_name }}"
+        source: build
+        build:         # <-- add
+          path: /home/ubuntu/velo-legal/back  # Path to the folder containing the Dockerfile
+      register: build_result
+
+    - name: Ensure Docker container is running
+      docker_container:
+        name: "{{ container_name }}"
+        image: "{{ container_name }}"
+        state: started
+        restart_policy: always
+        ports:
+          - "80:80"
+      when: build_result is succeeded
